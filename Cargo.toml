@@ -9,6 +9,7 @@ authors = ["Avery Wagar <ajmw.subs@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-structopt = "0.2"
+#structopt = "0.2"
 image = "0.21.2"
-termcolor = "1"
+crossterm = "0.9.6"
+#termcolor = "1"
