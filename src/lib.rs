@@ -1,14 +1,17 @@
-use image::RgbImage;
+use image::DynamicImage;
 use std::error::Error;
 use std::io::Write;
+use std::path;
 
 /// 10 Levels of grayscale
 const GSCALE_10: &[char] = &[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'];
 const GSCALE_70: &str = " .\"`^\",:;Il!i~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
 const GAMMA: f64 = 2.2;
 
-type RasciiOutput = Vec<Vec<(char, RasciiColor)>>;
+/// Representation of ascii output
+pub type RasciiOutput = Vec<Vec<(char, RasciiColor)>>;
 
+/// Representation of an ascii tile color
 #[derive(Debug)]
 pub enum RasciiColor {
     RGB(u8, u8, u8),
@@ -19,28 +22,32 @@ impl RasciiColor {
     fn to_grayscale(&self) -> u8 {
         match self {
             RasciiColor::RGB(r, g, b) => {
-                let rlin = (*r as f64).powf(GAMMA);
-                let blin = (*b as f64).powf(GAMMA);
-                let glin = (*g as f64).powf(GAMMA);
+                let rlin = (f64::from(*r)).powf(GAMMA);
+                let blin = (f64::from(*b)).powf(GAMMA);
+                let glin = (f64::from(*g)).powf(GAMMA);
 
                 let y = (0.2126 * rlin) + (0.7152 * glin) + (0.0722 * blin);
 
-                let l = (116.0 * y.powf(1.0 / 3.0) - 16.0) as u8;
-                l
+                (116.0 * y.powf(1.0 / 3.0) - 16.0) as u8
             }
             RasciiColor::Grayscale(l) => *l,
         }
     }
 }
 
-/// Convert the image to rascii based on the settings provided
-pub fn run(
-    image: RgbImage,
+/// Converts an image to ascii
+pub fn image_to_ascii<P: AsRef<path::Path>>(
+    image: P,
     dim: (u32, u32),
     color: bool,
     depth: u8,
 ) -> Result<RasciiOutput, Box<dyn Error>> {
     let mut output: RasciiOutput = Vec::new();
+
+    // load the image
+    let image: DynamicImage = image::open(image)?;
+    let image = image.to_rgb();
+
     // Dimensions of image
     let (width, height) = image.dimensions();
 
@@ -96,11 +103,11 @@ pub fn run(
                     }) / tile_pixel_data.len()) as u8,
                 );
                 if depth > 10 {
-                    let index = (avg.to_grayscale() as f64 / 255.0) * 67.0;
+                    let index = (f64::from(avg.to_grayscale()) / 255.0) * 67.0;
                     let chars = GSCALE_70.chars().collect::<Vec<char>>();
                     ascii_char = chars[index as usize];
                 } else {
-                    let index = (avg.to_grayscale() as f64 / 255.0) * 9.0;
+                    let index = (f64::from(avg.to_grayscale()) / 255.0) * 9.0;
                     ascii_char = GSCALE_10[index as usize];
                 }
             } else {
@@ -118,11 +125,11 @@ pub fn run(
                     _ => 0,
                 };
                 if depth > 10 {
-                    let index = (x as f64 / 255.0) * 67.0;
+                    let index = (f64::from(x) / 255.0) * 67.0;
                     let chars = GSCALE_70.chars().collect::<Vec<char>>();
                     ascii_char = chars[index as usize];
                 } else {
-                    let index = (x as f64 / 255.0) * 9.0;
+                    let index = (f64::from(x) / 255.0) * 9.0;
                     ascii_char = GSCALE_10[index as usize];
                 }
             }
@@ -140,7 +147,12 @@ pub fn run(
     Ok(output)
 }
 
-pub fn print<W: Write, F1: Fn(&mut W, (u8, u8, u8)) + Copy, F2: Fn(&mut W, (u8, u8, u8)) + Copy>(
+/// Default print function
+pub fn print_ascii<
+    W: Write,
+    F1: Fn(&mut W, (u8, u8, u8)) + Copy,
+    F2: Fn(&mut W, (u8, u8, u8)) + Copy,
+>(
     output: RasciiOutput,
     stdout: &mut W,
     color_fg: Option<F1>,
@@ -161,7 +173,7 @@ pub fn print<W: Write, F1: Fn(&mut W, (u8, u8, u8)) + Copy, F2: Fn(&mut W, (u8, 
             }
             write!(stdout, "{}", col.0)?;
         }
-        writeln!(stdout, "")?;
+        writeln!(stdout)?;
     }
     Ok(())
 }
